@@ -1,5 +1,8 @@
 library(gts)
-library(scam)
+
+# install.packages(c("akima", "fields", "lubridate", "maps", "maptools", "methods",
+#                    "mgcv", "ncdf4", "nctools", "sp", "remotes"))
+# remotes::install_github("roliveros-ramos/gts")
 
 # ESM
 global = read_gts("input/ipsl-cm5a-lr_historical_to_zs_monthly_195001_200512.nc4")
@@ -70,6 +73,7 @@ dat_obs = melt(quant_obs)
 
 dat = merge(dat_obs, dat_sim, all = TRUE)
 # dat = dat[complete.cases(dat), ]
+library(mgcv)
 mod = gam(sst ~ s(to), data=dat)
 
 mod$pred = predict(mod, newdata=dat)
