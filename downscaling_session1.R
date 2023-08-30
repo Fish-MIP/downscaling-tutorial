@@ -2,9 +2,9 @@ library(gts)
 
 install.packages(c("akima", "fields", "lubridate", "maps", "maptools", "methods",
                    "mgcv", "ncdf4", "sp", "remotes"))
-remotes::install_github("roliveros-ramos/gts")
 remotes::install_github("roliveros-ramos/colorful")
 remotes::install_github("roliveros-ramos/nctools")
+remotes::install_github("roliveros-ramos/gts")
 # ESM
 global = read_gts("input/ipsl-cm5a-lr_historical_to_zs_monthly_195001_200512.nc4")
 
