@@ -1,9 +1,9 @@
-install.packages(c("akima", "fields", "lubridate", "maps", "maptools", "methods",
-                   "mgcv", "ncdf4", "sp", "remotes"))
-remotes::install_github("cran/maptools")
-remotes::install_github("roliveros-ramos/colorful")
-remotes::install_github("roliveros-ramos/nctools")
-remotes::install_github("roliveros-ramos/gts")
+# install.packages(c("akima", "fields", "lubridate", "maps", "maptools", "methods",
+#                    "mgcv", "ncdf4", "sp", "remotes"))
+# remotes::install_github("cran/maptools")
+# remotes::install_github("roliveros-ramos/colorful")
+# remotes::install_github("roliveros-ramos/nctools")
+# remotes::install_github("roliveros-ramos/gts")
 
 library(gts)
 
@@ -112,11 +112,11 @@ sim85 = regrid(object = sim85, grid = obs, method="akima", extrap=TRUE)
 sim26 = sim26 - 273.15
 sim85 = sim85 - 273.15
 
-sim26 = sim26 - clim_sim + clim_obs
-sim85 = sim85 - clim_sim + clim_obs
+sim26_dm = sim26 - clim_sim + clim_obs
+sim85_dm = sim85 - clim_sim + clim_obs
 
-m26 = mean(sim26, by="time")
-m85 = mean(sim85, by="time")
+m26 = mean(sim26_dm, by="time")
+m85 = mean(sim85_dm, by="time")
 
 plot(media_sim, xlim=c(1980, 2100), ylim=c(20, 30), las=1)
 lines(m26, col="blue")
@@ -138,8 +138,15 @@ axis(2, las=1)
 axis(1, at=(1:12 - 0.5)/12, labels=month.abb)
 box()
 
-
 # quantile mapping
+
+xobs = obs$x[1,3,]
+xsim = sim$x[1,3,]
+par(mfrow=c(2,1))
+hist(xobs)
+hist(xsim-273.15)
+
+
 probs = seq(0, 1, by=0.05)
 quant_sim = quantile(sim3, probs=probs)
 quant_obs = quantile(obs, probs=probs)
@@ -150,27 +157,59 @@ dat_obs = melt(quant_obs)
 dat = merge(dat_obs, dat_sim, all = TRUE)
 # dat = dat[complete.cases(dat), ]
 library(mgcv)
-mod = gam(sst ~ s(to), data=dat)
-mod$pred = predict(mod, newdata=dat)
+library(scam)
+mod = gam(sst ~ s(to), data=dat) # 1.0
+mod0.0 = gam(sst ~ to, data=dat) # 0.0
+mod2.0 = gam(sst ~ s(lon, lat, by=to), data=dat) # 2.0
+mod3.0 = scam(sst ~ s(lon, lat, by=to), data=dat) # 3.0
+mod3.1 = scam(sst ~ s(lon, lat, by=to, bs="mpi"), data=dat) # 3.1
 
+dat$pred = predict(mod, newdata=dat)
+
+test = data.frame(to=seq(13, 30, by=0.01))
+test$pred = predict(mod, newdata=test)
+
+plot(pred ~ to, data=test)
+abline(c(0,1), col="red", lty=3)
+
+fsim3 = melt(sim3) # create a data.frame with rcp26
+fsim3$sst = predict(mod, newdata=fsim3) # predict with downscaling model
+sim_bc = sim3 # copy the original gts object
+sim_bc$x[] = fsim3$sst # replace values with the predictions
 
 # projection
-future = read_gts("input/ipsl-cm5a-lr_rcp26_to_zs_monthly_200601_21001231.nc4")
-longitude(future) = longitude(future, "center")
-fsim = subset(future, grid=obs, expand=5)
-fsim = regrid(object = fsim, grid = obs, method="akima", extrap=TRUE)
-fsim = fsim - 273.15
-fdat = melt(fsim)
-fdat$sst = predict(mod, newdata=fdat)
-fsim_bc = fsim
-fsim_bc$x[] = fdat$sst
+
+
+fdat26 = melt(sim26) # create a data.frame with rcp26
+fdat26$sst = predict(mod, newdata=fdat26) # predict with downscaling model
+sim26_bc = sim26 # copy the original gts object
+sim26_bc$x[] = fdat26$sst # replace values with the predictions
+
 
 par(mfrow=c(1,2))
-zlim = range(range(fsim, na.rm=TRUE), range(fsim_bc, na.rm=TRUE))
-plot(fsim, zlim=zlim)
-plot(fsim_bc, zlim=zlim)
+zlim = range(range(sim26, na.rm=TRUE), range(sim26_bc, na.rm=TRUE))
+plot(sim26, zlim=zlim)
+plot(sim26_bc, zlim=zlim)
+
+m_qm = mean(sim_bc, by="time")
+m26_qm = mean(sim26_bc, by="time")
+
+plot(media_sim, xlim=c(1980, 2100), ylim=c(20, 30), las=1)
+lines(m26, col="blue")
+# lines(m85, col="red")
+lines(m26_qm, col="green")
+
+mmsim = filter(media_sim, filter=rep(1, 12)/12)
+mm26 = filter(m26, filter=rep(1, 12)/12)
+mm26_qm = filter(m26_qm, filter=rep(1, 12)/12)
+mm_qm = filter(m_qm, filter=rep(1, 12)/12)
+
+plot(mm26, col="blue", ylim=c(20, 30), xlim=c(1980, 2100))
+lines(mm26_qm, col="green")
+lines(mmsim)
+lines(mm_qm)
 
 library(scam)
 
-write_ncdf(fsim_bc, filename="output.nc")
+write_ncdf(sim26_bc, filename="output_sprfmo.nc")
 
